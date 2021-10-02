@@ -164,7 +164,25 @@ public:
 
         FileUtil::remove_files_with_prefix(name_db_.c_str(), tmp_compact_file_prefix_);
 
-        
+        // load uncompacted files
+        std::multimap<uint64_t, uint64_t> map_uncompacted_file;
+        DIR* dirp;  // directory path
+        dirent* d_entry;
+        dirp = opendir(name_db_.c_str());
+
+        std::string filepath;
+        uint32_t fileid;
+        struct stat info;
+        while((d_entry = readdir(dirp)) != nullptr) {
+            fileid = FileWriter::hex_num(d_entry->d_name);
+            if( fileid < fileid_begin || fileid > fileid_end || fwriter_.fm_.isFileCompacted(fileid)) continue;
+            filepath = fwriter_.GetFileName(fileid);
+            if(stat(filepath.c_str(), &info)!=0 || !S_ISREG(info.st_mode)) continue;
+            Mmap memo_map(filepath.c_str(), info.st_size);
+            fwriter_.LoadOneFile(memo_map, fileid, map_uncompacted_file);
+        }
+        closedir(dirp);
+
 
     }
 

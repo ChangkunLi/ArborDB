@@ -271,7 +271,7 @@ public:
             if(stat(path.c_str(), &info) != 0) continue;
             Mmap memo_map(path, info.st_size);
             bool is_compacted;
-            LoadOneFile(memo_map, fileid, map_output, is_compacted);
+            LoadOneFile(memo_map, fileid, map_output, &is_compacted);
             fm_.SetFileSize(fileid, info.st_size);
             if(is_compacted) fm_.SetFileCompacted(fileid);
         }
@@ -281,14 +281,14 @@ public:
         closedir(dirp);
     }
 
-    void LoadOneFile(Mmap& memo_map, const uint32_t& fileid, std::multimap<uint64_t, uint64_t>& map_output, bool& is_compacted) {
+    void LoadOneFile(Mmap& memo_map, const uint32_t& fileid, std::multimap<uint64_t, uint64_t>& map_output, bool* is_compacted=nullptr) {
         FileFooter file_footer;
         FileFooter::Decoder(memo_map.datafile() + memo_map.filesize() - FileFooter::GetSize(), &file_footer);
         if(file_footer.magic_number != get_magic_number()){
             std::cout << "Wrong magic number" << std::endl;
             return;
         }
-        is_compacted = file_footer.IsCompacted();
+        if(is_compacted != nullptr) *is_compacted = file_footer.IsCompacted();
         uint64_t offset_imap = file_footer.offset_InternalMap;
         InternalMapLine line;
         for(int i=0; i<file_footer.num_records; i++){
