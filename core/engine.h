@@ -183,7 +183,74 @@ public:
         }
         closedir(dirp);
 
+        // find all records whose hashed key appears in "map_uncompacted_file"
+        std::vector<std::pair<uint64_t, uint64_t>> vec_of_uncompacted_hashed_key;
+        uint64_t prev_hashed_key;
+        uint64_t cur_hashed_key;
+        bool isFirst = true;
+        for(auto it = map_uncompacted_file.begin(); it!=map_uncompacted_file.end(); it++) {
+            cur_hashed_key = it->first;
+            if(isFirst){
+                prev_hashed_key = cur_hashed_key;
+                isFirst = false;
+            }
+            else if(cur_hashed_key == prev_hashed_key) continue;
+            else prev_hashed_key = cur_hashed_key;
+            auto interval = in_memory_map_.equal_range(cur_hashed_key);
+            for(auto sit = interval.first; sit != interval.second; sit++){
+                vec_of_uncompacted_hashed_key.push_back(*sit);
+            }
+        }
+        map_uncompacted_file.clear();
 
+        // pre-processing
+        // loc_delete : location to be deleted
+        // fileids_compact : fileids to be compacted
+        // keys_set : temporary hash set used to store all visited keys (in original format, not hashed format)
+        // hashedkey_to_loc_remain : locations to be kept together with their hashed key
+        std::unordered_set<uint64_t> loc_delete;
+        std::set<uint32_t> fileids_compact;
+        std::unordered_set<std::string> keys_set;
+        std::map<uint64_t, std::set<uint64_t>> hashedkey_to_loc_remain;
+
+        int N = vec_of_uncompacted_hashed_key.size();
+        uint64_t loc;
+        uint64_t hashed_key;
+        std::string real_key;
+        for(int i=N-1; i>=0; i--) {
+            hashed_key = vec_of_uncompacted_hashed_key[i].first;
+            loc = vec_of_uncompacted_hashed_key[i].second;
+            fileid = (loc >> 32);
+            fileids_compact.insert(fileid);
+            ByteArray key, value;
+            Status s = TestRecord(&key, &value, loc);
+            real_key = key.ToString();
+            if(!keys_set.count(real_key)) {
+                keys_set.insert(real_key);
+                if(!s.IsDeleteOrder()) hashedkey_to_loc_remain[hashed_key].insert(loc);
+                else loc_delete.insert(loc);
+            }
+            else loc_delete.insert(loc);
+        }
+        vec_of_uncompacted_hashed_key.clear();
+        keys_set.clear();
+
+        // hashedkeys_group : group of same hashed key indexed by the smallest location
+        // trailing_loc_for_hashed_key : stores all the non-smallest location in hashedkeys_group
+        std::unordered_map<uint64_t, std::vector<uint64_t>> hashedkeys_group; 
+        std::unordered_set<uint64_t> trailing_loc_for_hashed_key;
+        uint64_t min_loc;
+        for(auto it = hashedkey_to_loc_remain.begin(); it!=hashedkey_to_loc_remain.end(); it++) {
+            min_loc = *(it->second.begin());
+            hashedkeys_group[min_loc] = std::vector<uint64_t>(1, min_loc);
+            for(auto sit = ++(it->second.begin()); sit!=it->second.end(); sit++) {
+                hashedkeys_group[min_loc].push_back(*sit);
+                trailing_loc_for_hashed_key.insert(*sit);
+            }
+        }
+        hashedkey_to_loc_remain.clear();
+
+        //
     }
 
     void Compact() {
