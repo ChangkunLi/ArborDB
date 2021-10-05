@@ -50,6 +50,7 @@ public:
         has_unfinished_file = false;
         has_unfinished_request = false;
         is_closed_ = false;
+        is_timestamp_locked = false;
         offset_begin_ = 0;
         offset_end_ = 0;
     }
@@ -105,7 +106,7 @@ public:
     }
 
     void SetNextTimestamp(uint32_t timestamp_in) {
-        next_timestamp_ = timestamp_in;
+        if(!is_timestamp_locked) next_timestamp_ = timestamp_in;
     }
 
     uint64_t GetNextTimestamp() {
@@ -113,7 +114,13 @@ public:
     }
 
     uint64_t IncreaseNextTimestamp() {
-        return ++next_timestamp_;
+        if(!is_timestamp_locked) next_timestamp_++;
+        return next_timestamp_;
+    }
+
+    void LockTimestamp(uint64_t timestamp_in) {
+        is_timestamp_locked = true;
+        next_timestamp_ = timestamp_in;
     }
 
     void CreateFile() {
@@ -310,6 +317,7 @@ private:
     bool is_closed_;
     bool has_unfinished_file;
     bool has_unfinished_request;
+    bool is_timestamp_locked;
     uint32_t IsCompacted_;
 
     uint32_t cur_fileid_;

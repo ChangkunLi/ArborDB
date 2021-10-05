@@ -250,7 +250,159 @@ public:
         }
         hashedkey_to_loc_remain.clear();
 
-        //
+        // pre-allocate files 
+        uint32_t num_tmp_files = 0;
+        for(auto it = fileids_compact.begin(); it != fileids_compact.end(); it++) {
+            num_tmp_files+= 1;
+            fileid = *it;
+            uint64_t sz = fwriter_.fm_.GetFileSize(fileid);
+            std::string path_tmp = fwriter_compact_.GetFileName(fileid);
+            FileUtil::fallocate_filepath(path_tmp, sz);
+        }
+
+        // mmap all the files which are required for compaction
+        std::unordered_map<uint32_t, Mmap*> mmaps_compact;  // clear() will call the destructor, no need to worry about memory leak
+        for(auto it = fileids_compact.begin(); it != fileids_compact.end(); it++) {
+            fileid = *it;
+            std::string path_file = fwriter_.GetFileName(fileid);
+            uint64_t sz = fwriter_.fm_.GetFileSize(fileid);
+            Mmap* mmap = new Mmap(path_file, sz);
+            mmaps_compact[fileid] = mmap;
+        }
+
+        // produce a vector of struct Requests which will be written to new compacted file on disk
+        std::vector<Request> requests;
+        uint64_t max_timestamp_compact = 0;
+        for(auto it = fileids_compact.begin(); it != fileids_compact.end(); it++) {
+            fileid = *it;
+            Mmap* mmap = mmaps_compact[fileid];
+            FileHeader f_header;
+            FileHeader::Decoder(mmap->datafile(), &f_header);
+            max_timestamp_compact = std::max(max_timestamp_compact, f_header.timestamp);
+            FileFooter f_footer;
+            FileFooter::Decoder(mmap->datafile()+mmap->filesize()-FileFooter::GetSize(), &f_footer);
+            uint64_t offset_internal_map = f_footer.offset_InternalMap;
+
+            uint32_t offset = FileHeader::GetSize();
+            while(offset < offset_internal_map) {
+                RecordHeader r_header;
+                RecordHeader::Decoder(mmap->datafile()+offset, &r_header);
+                uint64_t loc = fileid;
+                loc = loc << 32;
+                loc = loc | offset;
+                if(loc_delete.count(loc) || trailing_loc_for_hashed_key.count(loc)){
+                    offset += RecordHeader::GetSize() + r_header.size_key + r_header.size_val;
+                    continue;
+                }
+
+                std::vector<uint64_t> locations;
+                auto hit = hashedkeys_group.find(loc);
+                if(hit == hashedkeys_group.end()) locations.push_back(loc);
+                else locations = hit->second;
+
+                for(auto& _loc_ : locations) {
+                    uint32_t _fileid_ = _loc_ >> 32;
+                    uint32_t _offset_ = _loc_ & 0xFFFFFFFF;
+                    Mmap* _map_ = mmaps_compact[_fileid_];
+                    RecordHeader _r_header_;
+                    RecordHeader::Decoder(_map_->datafile() + _offset_, &_r_header_);
+                    ByteArray key = ByteArray::NewCopyByteArray(_map_->datafile() + _offset_ + RecordHeader::GetSize(), _r_header_.size_key);
+                    ByteArray value = ByteArray::NewCopyByteArray(_map_->datafile() + _offset_ + RecordHeader::GetSize() + _r_header_.size_key, _r_header_.size_val);
+
+                    requests.push_back(Request{std::this_thread::get_id(), TypeRequest::Put, key, value, _r_header_.size_val});
+                }
+                offset += RecordHeader::GetSize() + r_header.size_key + r_header.size_val;
+            }
+        }
+
+        // persist requests to temporary files
+        std::multimap<uint64_t, uint64_t> map_compact;
+        fwriter_compact_.reset();
+        fwriter_compact_.LockTimestamp(max_timestamp_compact);
+        fwriter_compact_.Write_Requests_To_Buffer(requests, map_compact);
+        fwriter_compact_.FinishCurrentFile();
+        requests.clear();
+        mmaps_compact.clear();  // destructor will be called so file will be unmapped and closed automatically
+
+        // rename file to normal database file
+        uint32_t num_new_files = fwriter_compact_.GetNextFileID();
+        uint32_t fileid_compact_shift = fwriter_.IncreaseNextFileID(num_new_files) - num_new_files;
+        for(uint32_t i=0; i<num_new_files; i++) {
+            uint32_t _fileid_ = fileid_compact_shift + i + 1;
+            std::rename(fwriter_compact_.GetFileName(i+1).c_str(), fwriter_.GetFileName(_fileid_).c_str());
+            uint64_t sz = fwriter_compact_.fm_.GetFileSize(i+1);
+            fwriter_.fm_.SetFileSize(_fileid_, sz);
+            fwriter_.fm_.SetFileCompacted(_fileid_);
+        }
+
+        // modify map_compact
+        uint64_t f_shift = fileid_compact_shift;
+        f_shift = f_shift << 32;
+        for(auto& elem : map_compact) elem.second+= f_shift;
+
+        // update in_memory_map_
+        int max_consecutive_write = 50;
+        int count = 0;
+        for(auto it = map_compact.begin(); it != map_compact.end(); it = map_compact.upper_bound(it->first)) {
+            if((count % max_consecutive_write) == 0){
+                mutex_write_.lock();  // grab the lock to write in_memory map
+                while(true) {
+                    std::unique_lock<std::mutex> lock_read(mutex_read_);
+                    if(num_readers_ == 0) break;
+                    cv_read_.wait(lock_read);
+                }
+            }
+            count++;
+
+            // working section being
+            hashed_key = it->first;
+            auto range_del = in_memory_map_.equal_range(hashed_key);
+            std::vector<uint64_t> loc_keep;
+            for(auto sit = range_del.first; sit != range_del.second; sit++) {
+                loc = sit->second;
+                uint32_t _fileid_ = loc >> 32;
+                if(_fileid_ > fileid_end) loc_keep.push_back(loc);
+            }
+
+            in_memory_map_.erase(hashed_key);
+            auto range_add = map_compact.equal_range(hashed_key);
+            in_memory_map_.insert(range_add.first, range_add.second);
+            for(auto& _loc_ : loc_keep) in_memory_map_.insert(std::make_pair(hashed_key, _loc_));
+            // working section end
+
+            if((count % max_consecutive_write) == 0) mutex_write_.unlock();
+        }
+        if((count % max_consecutive_write) != 0) mutex_write_.unlock();   
+
+        // dump "in_memory_map_compact_" into "in_memory_map_"
+        mutex_compaction_check_.lock();
+        is_in_compaction_ = false;
+        mutex_map_main_.lock();
+        mutex_map_compact_.lock();
+        mutex_compaction_check_.unlock();
+
+        mutex_write_.lock();  // grab the lock to write in_memory map
+        while(true) {
+            std::unique_lock<std::mutex> lock_read(mutex_read_);
+            if(num_readers_ == 0) break;
+            cv_read_.wait(lock_read);
+        }  // wait for readers to finish
+
+        // critical section : begin
+        in_memory_map_.insert(in_memory_map_compact_.begin(), in_memory_map_compact_.end());
+        in_memory_map_compact_.clear();
+        // critical section : end
+
+        mutex_write_.unlock();
+        mutex_map_main_.unlock();
+        mutex_map_compact_.unlock();
+        
+        // delete compacted files and pre-allocated files
+        for(auto& _fileid_ : fileids_compact) {
+            std::remove(fwriter_.GetFileName(_fileid_).c_str());
+            fwriter_.fm_.ClearFileID(_fileid_);
+        }
+        FileUtil::remove_files_with_prefix(name_db_.c_str(), tmp_compact_file_prefix_);
     }
 
     void Compact() {
