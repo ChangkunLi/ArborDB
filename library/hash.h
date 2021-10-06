@@ -8,7 +8,7 @@
 
 namespace mydb
 {
-    uint64_t HashFunction(const char* data, uint32_t len){
+    inline uint64_t HashFunction(const char* data, uint32_t len){
         static char hash[16];
         static uint64_t ret;
         MurmurHash3_x86_128(data,len,0,hash);

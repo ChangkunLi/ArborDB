@@ -104,7 +104,7 @@ namespace mydb
     }
 
     Status CacheBuffer::WriteRequest(const TypeRequest& type, ByteArray& key, ByteArray& chunk) {
-        if (isReadyToClose) return Status::IOError("Can not update request because database has been closed");
+        if (isReadyToClose()) return Status::IOError("Can not update request because database has been closed");
         uint64_t bytes_incoming = key.size() + chunk.size();
         rate_limiter.Stop(bytes_incoming);
         // Grab key to write, because at any given time, only one writer is allowed

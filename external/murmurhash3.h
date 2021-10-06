@@ -17,6 +17,7 @@ typedef unsigned __int64 uint64_t;
 #else // defined(_MSC_VER)
 
 #include <stdint.h>
+#include <cstring>
 
 #endif // !defined(_MSC_VER)
 
@@ -24,9 +25,9 @@ typedef unsigned __int64 uint64_t;
 
 namespace mydb
 {
-    void MurmurHash3_x86_128(const void *key, int len, uint32_t seed, void *out);
+    extern void MurmurHash3_x86_128(const void *key, int len, uint32_t seed, void *out);
 
-    uint64_t Murmurhash(const char* data, uint32_t len) {
+    inline uint64_t Murmurhash(const char* data, uint32_t len) {
         static char hash[16];
         static uint64_t ret;
         MurmurHash3_x86_128(data, len, 1997, hash);

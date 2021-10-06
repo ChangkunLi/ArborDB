@@ -22,6 +22,7 @@ namespace mydb
             stop_requested = false;
             index_recv = 0;
             index_copy = 1;
+            buffers.resize(2);
             buf_sizes.resize(2);
             buf_sizes[0] = buf_sizes[1] = 0;
             num_readers_recv = 0;

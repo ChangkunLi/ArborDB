@@ -20,6 +20,7 @@ namespace mydb
         public:
             Database(const std::string& name_in) {
                 name = getName(name_in);
+                is_closed  = true;
             }
             
             virtual ~Database() { Close(); }
@@ -66,7 +67,7 @@ namespace mydb
                 evm = new EventManager();
                 c_buf = new CacheBuffer(32*1024*1024,evm);
                 d_eng = new DiskEngine(evm, name);
-                is_closed = true;
+                is_closed = false;
                 return Status::OK();
             }
 
@@ -75,6 +76,32 @@ namespace mydb
             virtual Status Put(ByteArray &key, ByteArray &chunk);
 
             virtual Status Delete(ByteArray &key);
+
+            // some overload
+
+            virtual Status Get(ByteArray &key, std::string* value_out){
+                return ArborDB::Get(key, value_out);
+            }
+
+            virtual Status Get(const std::string &key, ByteArray *value_out){
+                return ArborDB::Get(key, value_out);
+            }
+
+            virtual Status Get(const std::string &key, std::string *value_out){
+                return ArborDB::Get(key, value_out);
+            }
+
+            virtual Status Put(ByteArray &key, const std::string &chunk){
+                return ArborDB::Put(key, chunk);
+            }
+
+            virtual Status Put(const std::string &key, ByteArray &chunk){
+                return ArborDB::Put(key, chunk);
+            }
+
+            virtual Status Put(const std::string &key, const std::string &chunk){
+                return ArborDB::Put(key, chunk);
+            }
 
         private:
             std::string name;

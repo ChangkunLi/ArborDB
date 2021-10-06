@@ -1,1 +1,6 @@
 /.vscode
+/*/*.d
+/*/*.o
+/*.d
+/local_test/*.dSYM
+/local_test/test_main

@@ -1,6 +1,6 @@
 #ifndef GENERAL_HEADERS
 #define GENERAL_HEADERS
 
-#include "interface/arbordb.h"
+#include "interface/database.h"
 
 #endif

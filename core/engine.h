@@ -155,7 +155,7 @@ public:
         }
     }
 
-    Status Compaction(uint32_t fileid_begin, uint32_t fileid_end) {  // central part of this database engine
+    void Compaction(uint32_t fileid_begin, uint32_t fileid_end) {  // central part of this database engine
         mutex_compaction_check_.lock();
         is_in_compaction_ = true;
         mutex_map_main_.lock();
@@ -472,11 +472,11 @@ public:
 private:
     EventManager* evm_;
 
-    FileWriter fwriter_;
-    FileWriter fwriter_compact_;
-
     std::string name_db_;
     std::string tmp_compact_file_prefix_;
+
+    FileWriter fwriter_;
+    FileWriter fwriter_compact_;
 
     uint32_t num_readers_;
 
