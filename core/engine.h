@@ -287,6 +287,10 @@ public:
             while(offset < offset_internal_map) {
                 RecordHeader r_header;
                 RecordHeader::Decoder(mmap->datafile()+offset, &r_header);
+                // debug : ------------------------------------
+                // std::cout << "offset : " << offset << std::endl;
+                // std::cout << "key size: " << r_header.size_key << std::endl;
+                // std::cout << "val size: " << r_header.size_val << std::endl;
                 uint64_t loc = fileid;
                 loc = loc << 32;
                 loc = loc | offset;

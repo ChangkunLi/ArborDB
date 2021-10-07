@@ -4,3 +4,6 @@
 /*.d
 /local_test/*.dSYM
 /local_test/test_main
+/local_test/local_test_db
+test_main
+bin/

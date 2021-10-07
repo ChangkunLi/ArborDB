@@ -13,7 +13,7 @@ default:
 	mv libarbordb.a $(LIBDIR)
 
 local_test:
-	g++ -std=c++17 -I/usr/local/include/ -I/opt/local/include/ -I./ -L/usr/local/lib/ -L/opt/local/lib -Lbin -larbordb local_test/test_main.cpp -o test_main
+	g++ -std=c++17 -I/usr/local/include/ -I/opt/local/include/ -I./ -L/usr/local/lib/ -L/opt/local/lib -Lbin -lpthread -larbordb local_test/test_main.cpp -o test_main
 
 $(LIBRARY): $(OBJECTS)
 	rm -rf $@
@@ -26,6 +26,7 @@ clean:
 	rm -rf */*.d
 	rm -rf */*.o
 	rm -rf bin/*
+	rm -rf *.d
 
 .PHONY: local_test
 

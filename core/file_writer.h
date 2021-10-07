@@ -142,7 +142,7 @@ public:
     uint32_t FlushCurrentFile() {
         if(!has_unfinished_file) return 0;
 
-        if(!has_unfinished_request){
+        if(has_unfinished_request){
             write(fd_, buf_file + offset_begin_, offset_end_ - offset_begin_);
             fm_.SetFileSize(cur_fileid_, offset_end_);
             offset_begin_ = offset_end_;
@@ -204,7 +204,7 @@ public:
         for(Request& req:requests){
             if(offset_end_ >= max_size) FlushCurrentFile();  // finish current file
             if(!has_unfinished_file) CreateFile();  // also reset offset_begin_ and offset_end_
-            uint64_t hashed_key = Murmurhash(req.key.bytes(), req.key.size());
+            uint64_t hashed_key = HashFunction(req.key.bytes(), req.key.size());
 
             // write request to buffer -- start
             uint64_t loc = WriteOneRequest(hashed_key, req);
@@ -257,8 +257,8 @@ public:
         // we could use a multimap here because if two files have same timestamp, they can only be created during the same compaction process
         // which means that they won't have any identical hashed key, so we can load them in any order
         char path_to_dbfile[1024];
-        uint32_t fileid, max_fileid;
-        uint64_t max_timestamp;
+        uint32_t fileid, max_fileid = 0;
+        uint64_t max_timestamp = 0;
         struct stat info;
         while((d_entry = readdir(dirp)) != nullptr) {
             snprintf(path_to_dbfile, 1024, "%s/%s", dbname_.c_str(), d_entry->d_name);
