@@ -14,6 +14,7 @@ default:
 
 local_test:
 	g++ -std=c++17 -I/usr/local/include/ -I/opt/local/include/ -I./ -L/usr/local/lib/ -L/opt/local/lib -Lbin -lpthread -larbordb local_test/test_main.cpp -o test_main
+	./test_main
 
 $(LIBRARY): $(OBJECTS)
 	rm -rf $@
