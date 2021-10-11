@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <random>
-#include <chrono>
 #include <cstring>
 
 #include "library/hash.h"
@@ -94,7 +93,48 @@ public:
     ~ClientTask() {}
 
     void Run() {
-        
+        Client client(host_);
+
+        std::default_random_engine generator(1997);
+        std::uniform_int_distribution<int> distribution(64, 512);
+
+        std::string key;
+        std::vector<int> sz_vals(num_puts_, 0);
+        for(int i=0; i<num_puts_; i++){
+            key = std::string("key_") + std::to_string(i);
+            int sz_val = distribution(generator);
+            char* val = CalculateVal(key, sz_val);
+            Status s = client.Put(key.c_str(), key.size(), val, sz_val);
+            sz_vals[i] = sz_val;
+            delete[] val;
+        }
+
+        for(int i=0; i<num_dels_; i++){
+            key = std::string("key_") + std::to_string(i%num_puts_);
+            client.Delete(key.c_str(), key.size());
+            if(i<num_puts_){
+                sz_vals[i] = -1;
+            }
+        }
+
+        int count = 0;
+        for(int i=0; i<num_gets_; i++){
+            key = std::string("key_") + std::to_string(i%num_puts_);
+            char* val_get = nullptr;
+            size_t sz_val_get;
+            Status s =client.Get(key, &val_get, &sz_val_get);
+            if(sz_vals[i%num_puts_] == -1){
+                if(s.IsNotFound()) count++;
+            }
+            else{
+                if(s.IsOK() && sz_vals[i%num_puts_]==sz_val_get && CheckVal(key, sz_val_get, val_get)){
+                    count++;
+                }
+            }
+            if(val_get != nullptr) delete[] val_get;
+        }
+
+        if(count == num_gets_) std::cout << "Passed network test" << std::endl; 
     }
 
     char* CalculateVal(const std::string& key, int len) {
@@ -119,7 +159,6 @@ private:
     int num_puts_;
     int num_dels_;
     int num_gets_;
-    std::unordered_set<std::string> deleted_keys_;
 };
 
 } // namespace mydb
