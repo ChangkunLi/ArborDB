@@ -1,6 +1,8 @@
 #ifndef TASK_H_
 #define TASK_H_
 
+#include <thread>
+
 namespace mydb
 {
 class Task{
@@ -9,7 +11,7 @@ public:
 
     virtual ~Task() {}
 
-    virtual void Run() = 0;
+    virtual void Run(std::thread::id tid) = 0;
 };
 
 } // namespace mydb

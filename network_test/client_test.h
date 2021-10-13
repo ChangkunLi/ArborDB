@@ -92,7 +92,7 @@ public:
 
     ~ClientTask() {}
 
-    void Run() {
+    void Run(std::thread::id tid) {
         Client client(host_);
 
         std::default_random_engine generator(1997);
@@ -100,8 +100,10 @@ public:
 
         std::string key;
         std::vector<int> sz_vals(num_puts_, 0);
+        std::stringstream ss;
+        ss << tid;
         for(int i=0; i<num_puts_; i++){
-            key = std::string("key_") + std::to_string(i);
+            key = std::string("key_") + std::to_string(i) + "_" + ss.str();
             int sz_val = distribution(generator);
             char* val = CalculateVal(key, sz_val);
             Status s = client.Put(key.c_str(), key.size(), val, sz_val);
@@ -110,7 +112,7 @@ public:
         }
 
         for(int i=0; i<num_dels_; i++){
-            key = std::string("key_") + std::to_string(i%num_puts_);
+            key = std::string("key_") + std::to_string(i%num_puts_) + "_" + ss.str();
             client.Delete(key.c_str(), key.size());
             if(i<num_puts_){
                 sz_vals[i] = -1;
@@ -119,7 +121,7 @@ public:
 
         int count = 0;
         for(int i=0; i<num_gets_; i++){
-            key = std::string("key_") + std::to_string(i%num_puts_);
+            key = std::string("key_") + std::to_string(i%num_puts_) + "_" + ss.str();
             char* val_get = nullptr;
             size_t sz_val_get;
             Status s =client.Get(key, &val_get, &sz_val_get);
@@ -134,7 +136,7 @@ public:
             if(val_get != nullptr) delete[] val_get;
         }
 
-        if(count == num_gets_) std::cout << "Passed network test" << std::endl; 
+        if(count == num_gets_) std::cout << "Passed network test on thread id : " << ss.str() << std::endl; 
     }
 
     char* CalculateVal(const std::string& key, int len) {
