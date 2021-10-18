@@ -8,6 +8,7 @@ int main() {
     int num_gets = 15;
 
     mydb::ThreadPool thread_pool(num_threads);
+    thread_pool.Start();
     for(int i=0; i<num_threads; i++){
         mydb::ClientTask* client_task = new mydb::ClientTask(host, num_puts, num_dels, num_gets);
         thread_pool.AddTask(client_task);
