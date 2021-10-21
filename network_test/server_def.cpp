@@ -3,7 +3,74 @@
 namespace mydb
 {
 void ServerTask::Run(std::thread::id tid) {
-    
+    // here, I assumed that for tcp connection, one send() is corresponding to one recv(),
+    // for larger "message" this is not true because one "message" could be splitted into 
+    // multiple "segments" (TCP packets) and recv buffer may not be large enough to receive
+    // one packet in one recv() call.
+
+    // If I have time in the future, I will improve this part to make it more robust and generic
+    char key[512];
+    char val[1024];
+    char buffer_recv[1024];
+    char buffer_send[1024];
+    std::regex regex_put("set ([\\S]*) \\d* \\d* (\\d*)\r\n");
+    bool is_get, is_put, is_del;
+    uint32_t size_key, size_val;
+    uint32_t bytes_received;
+    while(true){
+        is_get = is_put = is_del = false;
+        bytes_received = recv(socket_fd_, buffer_recv, 1024, 0);
+        if(bytes_received <= 0) break;
+        if(memcmp(buffer_recv, "get", 3) == 0) is_get = true;
+        else if(memcmp(buffer_recv, "set", 3) == 0) is_put = true;
+        else if(memcmp(buffer_recv, "delete", 6) == 0) is_del = true;
+        else if(memcmp(buffer_recv, "quit", 4) == 0) break;
+
+        if(is_put) {
+            uint32_t offset = 4;
+            while(buffer_recv[offset] != ' ') offset += 1;
+            size_key = offset - 4;
+            memcpy(key, buffer_recv + 4, size_key);
+            while(buffer_recv[offset] != '\n') offset += 1;
+            offset += 1;    // for the \n
+
+            std::smatch match;
+            std::string s(buffer_recv, offset);
+            std::regex_search(s, match, regex_put);
+            size_val = std::stoi(match[2].str());
+            memcpy(val, buffer_recv + offset, size_val);
+
+            ByteArray _key_ = ByteArray::NewReferenceByteArray(key, size_key);
+            ByteArray _val_ = ByteArray::NewReferenceByteArray(val, size_val);
+            db_->Put(_key_, _val_);
+            send(socket_fd_, "STORED\r\n", 8, 0);
+        }
+        else if(is_del) {
+            size_key = bytes_received - 7 - 2;
+            memcpy(key, buffer_recv + 7, size_key);
+            ByteArray _key_ = ByteArray::NewReferenceByteArray(key, size_key);
+            db_->Delete(_key_);
+            send(socket_fd_, "DELETED\r\n", 9, 0);
+        }
+        else if(is_get) {
+            size_key = bytes_received - 4 - 2;
+            memcpy(key, buffer_recv + 4, size_key);
+            ByteArray _key_ = ByteArray::NewReferenceByteArray(key, size_key);
+            std::string _val_;
+            Status s = db_->Get(_key_, &_val_);
+            if(s.IsOK()){
+                snprintf(buffer_send, 1024, "VALUE %s 0 %" PRIu64 "\r\n%s\r\n", 
+                        _key_.ToString().c_str(), _val_.size(), _val_.c_str());
+                send(socket_fd_, buffer_send, strlen(buffer_send), 0);
+                send(socket_fd_, "END\r\n", 5, 0);
+            }
+            else{
+                send(socket_fd_, "NOT_FOUDN\r\n", 11, 0);
+            }
+        }
+    }
+
+    close(socket_fd_);  // close connection to client socket because we have already finished client task
 }
 
 void Server::ListenLoop() {

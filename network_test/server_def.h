@@ -11,6 +11,7 @@
 #include <arpa/inet.h>
 #include <sys/wait.h>
 #include <signal.h>
+#include <regex>
 
 #include "network_test/task.h"
 #include "interface/database.h"
@@ -47,6 +48,8 @@ public:
     }
 
     void ListenLoop();
+
+    bool IsStopRequested() { return is_stop_requested_; }
 
     void Stop() {
         is_stop_requested_ = true;
