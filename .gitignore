@@ -6,5 +6,7 @@
 /local_test/test_main
 /local_test/local_test_db
 test_main
+server
+client
 bin/
 local_test_db

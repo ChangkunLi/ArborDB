@@ -68,7 +68,7 @@ public:
             return Status::IOError(error_msg);
         }
 
-        if(ret_val = memcached_fetch(memc, ret_key, &ret_key_len, &ret_val_len, &flags, &ret)){
+        if((ret_val = memcached_fetch(memc, ret_key, &ret_key_len, &ret_val_len, &flags, &ret))){
             memcpy(buffer, ret_val, ret_val_len);
             buffer[ret_val_len] = '\0';
             *val_out = buffer;
