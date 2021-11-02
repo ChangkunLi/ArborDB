@@ -2,7 +2,7 @@
 
 int main() {
     std::string host = "--SERVER=127.0.0.1:23333";  // port number is 23333
-    int num_threads = 10;
+    int num_threads = 5;
     int num_puts = 10;
     int num_dels = 5;
     int num_gets = 15;

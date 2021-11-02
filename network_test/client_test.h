@@ -119,8 +119,8 @@ public:
             char* val = CalculateVal(key, sz_val);
             Status s = client.Put(key.c_str(), key.size(), val, sz_val);
 
-            std::cout << "Put key : " <<  key << std::endl;
-            std::cout << "Put val : " << std::string(val, sz_val) << std::endl;
+            // std::cout << "Put key : " <<  key << std::endl;
+            // std::cout << "Put val : " << std::string(val, sz_val) << std::endl;
 
             sz_vals[i] = sz_val;
             delete[] val;
@@ -130,7 +130,7 @@ public:
             key = std::string("key_") + std::to_string(i%num_puts_) + "_" + ss.str();
             client.Delete(key.c_str(), key.size());
 
-            std::cout << "Delete key : " <<  key << std::endl;
+            // std::cout << "Delete key : " <<  key << std::endl;
 
             if(i<num_puts_){
                 sz_vals[i] = -1;
