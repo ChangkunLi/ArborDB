@@ -47,15 +47,27 @@ void ServerTask::Run(std::thread::id tid) {
             size_val = std::stoi(match[2].str());
             memcpy(val, buffer_recv + offset, size_val);
 
-            ByteArray _key_ = ByteArray::NewReferenceByteArray(key, size_key);
-            ByteArray _val_ = ByteArray::NewReferenceByteArray(val, size_val);
+            ByteArray _key_ = ByteArray::NewCopyByteArray(key, size_key);
+            ByteArray _val_ = ByteArray::NewCopyByteArray(val, size_val);
+
+            std::cout << "Put key : " << _key_.ToString() << " on thread id : " << ss.str() << std::endl;
+            std::cout << "Put val : " << _val_.ToString() << " on thread id : " << ss.str() << std::endl;
+
             db_->Put(_key_, _val_);
+
+            std::string val_check;
+            db_->Get(_key_, &val_check);
+            std::cout << "Put val check : " << val_check << " on thread id : " << ss.str() << std::endl;
+
             send(socket_fd_, "STORED\r\n", 8, 0);
         }
         else if(is_del) {
             size_key = bytes_received - 7 - 2;
             memcpy(key, buffer_recv + 7, size_key);
-            ByteArray _key_ = ByteArray::NewReferenceByteArray(key, size_key);
+            ByteArray _key_ = ByteArray::NewCopyByteArray(key, size_key);
+
+            std::cout << "Delete key : " << _key_.ToString() << " on thread id : " << ss.str() << std::endl;
+
             db_->Delete(_key_);
             send(socket_fd_, "DELETED\r\n", 9, 0);
         }
@@ -65,6 +77,10 @@ void ServerTask::Run(std::thread::id tid) {
             ByteArray _key_ = ByteArray::NewReferenceByteArray(key, size_key);
             std::string _val_;
             Status s = db_->Get(_key_, &_val_);
+
+            std::cout << "Get key : " << _key_.ToString() << " on thread id : " << ss.str() << std::endl;
+            std::cout << "Get val : " << _val_ << " on thread id : " << ss.str() << std::endl;
+
             if(s.IsOK()){
                 snprintf(buffer_send, 1024, "VALUE %s 0 %" PRIu64 "\r\n%s\r\n", 
                         _key_.ToString().c_str(), _val_.size(), _val_.c_str());
