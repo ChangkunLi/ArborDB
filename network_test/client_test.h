@@ -47,37 +47,45 @@ public:
         return Status::OK();
     }
 
-    Status Get(const std::string& key, char **val_out, size_t *sz_val){
-        char* buffer = new char[1024];
-        memcached_return_t ret;
+    // Status Get(const std::string& key, char **val_out, size_t *sz_val){
+    //     char* buffer = new char[1024];
+    //     memcached_return_t ret;
+    //     uint32_t flags;
+    //     const char* keys[1];
+    //     keys[0] = key.c_str();
+    //     size_t key_len[1];
+    //     key_len[0] = key.size();
+
+    //     char ret_key[1024];
+    //     size_t ret_key_len;
+    //     char *ret_val;
+    //     size_t ret_val_len;
+
+    //     ret = memcached_mget(memc, keys, key_len, 1);
+    //     if(ret != MEMCACHED_SUCCESS){
+    //         delete[] buffer;
+    //         std::string error_msg = std::string(key) + std::string(" ") + std::string(memcached_strerror(memc, ret));
+    //         return Status::IOError(error_msg);
+    //     }
+
+    //     if((ret_val = memcached_fetch(memc, ret_key, &ret_key_len, &ret_val_len, &flags, &ret))){
+    //         memcpy(buffer, ret_val, ret_val_len);
+    //         buffer[ret_val_len] = '\0';
+    //         *val_out = buffer;
+    //         *sz_val = ret_val_len;
+    //         free(ret_val);
+    //     }
+
+    //     if(ret == MEMCACHED_END) return Status::NotFound("key: " + key);
+
+    //     return Status::OK();
+    // }
+
+    Status Get(const std::string& key, char **val_out, size_t *sz_val) {
         uint32_t flags;
-        const char* keys[1];
-        keys[0] = key.c_str();
-        size_t key_len[1];
-        key_len[0] = key.size();
-
-        char ret_key[1024];
-        size_t ret_key_len;
-        char *ret_val;
-        size_t ret_val_len;
-
-        ret = memcached_mget(memc, keys, key_len, 1);
-        if(ret != MEMCACHED_SUCCESS){
-            delete[] buffer;
-            std::string error_msg = std::string(key) + std::string(" ") + std::string(memcached_strerror(memc, ret));
-            return Status::IOError(error_msg);
-        }
-
-        if((ret_val = memcached_fetch(memc, ret_key, &ret_key_len, &ret_val_len, &flags, &ret))){
-            memcpy(buffer, ret_val, ret_val_len);
-            buffer[ret_val_len] = '\0';
-            *val_out = buffer;
-            *sz_val = ret_val_len;
-            free(ret_val);
-        }
-
-        if(ret == MEMCACHED_END) return Status::NotFound("key: " + key);
-
+        memcached_return_t ret;
+        *val_out = memcached_get(memc, key.c_str(), key.size(), sz_val, &flags, &ret);
+        if(*val_out == nullptr) return Status::NotFound("key: " + key);
         return Status::OK();
     }
 
@@ -110,6 +118,10 @@ public:
             int sz_val = distribution(generator);
             char* val = CalculateVal(key, sz_val);
             Status s = client.Put(key.c_str(), key.size(), val, sz_val);
+
+            std::cout << "Put key : " <<  key << std::endl;
+            std::cout << "Put val : " << std::string(val, sz_val) << std::endl;
+
             sz_vals[i] = sz_val;
             delete[] val;
         }
@@ -117,6 +129,9 @@ public:
         for(int i=0; i<num_dels_; i++){
             key = std::string("key_") + std::to_string(i%num_puts_) + "_" + ss.str();
             client.Delete(key.c_str(), key.size());
+
+            std::cout << "Delete key : " <<  key << std::endl;
+
             if(i<num_puts_){
                 sz_vals[i] = -1;
             }
@@ -127,7 +142,7 @@ public:
             key = std::string("key_") + std::to_string(i%num_puts_) + "_" + ss.str();
             char* val_get = nullptr;
             size_t sz_val_get;
-            Status s =client.Get(key, &val_get, &sz_val_get);
+            Status s = client.Get(key, &val_get, &sz_val_get);
             if(sz_vals[i%num_puts_] == -1){
                 if(s.IsNotFound()) count++;
             }
@@ -139,8 +154,8 @@ public:
             if(val_get != nullptr) delete[] val_get;
         }
 
-        if(count == num_gets_) std::cout << "Passed network test on thread id : " << ss.str() << std::endl; 
-        else std::cout << "Passed " << count << " network tests on thread id : " << ss.str() << std::endl;
+        if(count == num_gets_) std::cout << "Passed all network tests on thread id : " << ss.str() << std::endl; 
+        else std::cout << "Passed " << count << "/" << num_gets_ << " network tests on thread id : " << ss.str() << std::endl;
     }
 
     char* CalculateVal(const std::string& key, int len) {
