@@ -44,6 +44,7 @@ public:
         db_ = new Database(db_name_);
         db_->Open();
         thread_pool_ = new ThreadPool(10);
+        thread_pool_->Start();
         listen_thread_ = std::thread(&Server::ListenLoop, this);
     }
 

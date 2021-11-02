@@ -19,9 +19,9 @@ default: $(SOURCES) $(LIBRARY)
 default: 
 	mv libarbordb.a $(LIBDIR)
 
-server: $(SOURCES) $(SERVER)
+local_server: $(SOURCES) $(SOURCES_SERVER) $(SERVER)
 
-client: $(SOURCES) $(CLIENT)
+local_client: $(SOURCES) $(SOURCES_CLIENT) $(CLIENT)
 
 local_test:
 	g++ -std=c++17 -I/usr/local/include/ -I/opt/local/include/ -I./ -L/usr/local/lib/ -L/opt/local/lib -Lbin -lpthread -larbordb local_test/test_main.cpp -o test_main
@@ -45,9 +45,9 @@ clean:
 	rm -rf */*.o
 	rm -rf bin/*
 	rm -rf *.d
-	rm test_main
-	rm server
-	rm client
+	rm -f test_main
+	rm -f server
+	rm -f client
 
 .PHONY: local_test
 

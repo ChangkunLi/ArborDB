@@ -1,3 +1,5 @@
+#include <sstream>
+
 #include "network_test/server_def.h"
 
 namespace mydb
@@ -9,6 +11,11 @@ void ServerTask::Run(std::thread::id tid) {
     // one packet in one recv() call.
 
     // If I have time in the future, I will improve this part to make it more robust and generic
+    std::stringstream ss;
+    ss << tid;
+
+    std::cout << "Start task on thread id : " << ss.str() << std::endl;
+
     char key[512];
     char val[1024];
     char buffer_recv[1024];

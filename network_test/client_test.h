@@ -102,6 +102,9 @@ public:
         std::vector<int> sz_vals(num_puts_, 0);
         std::stringstream ss;
         ss << tid;
+
+        std::cout << "Start task on thread id : " << ss.str() << std::endl;
+
         for(int i=0; i<num_puts_; i++){
             key = std::string("key_") + std::to_string(i) + "_" + ss.str();
             int sz_val = distribution(generator);
@@ -137,6 +140,7 @@ public:
         }
 
         if(count == num_gets_) std::cout << "Passed network test on thread id : " << ss.str() << std::endl; 
+        else std::cout << "Passed " << count << " network tests on thread id : " << ss.str() << std::endl;
     }
 
     char* CalculateVal(const std::string& key, int len) {

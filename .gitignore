@@ -10,3 +10,4 @@ server
 client
 bin/
 local_test_db
+network_test_db
